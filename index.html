@@ -47,10 +47,39 @@
 
 <div id="app">
   <main id="home" class="home">
+    <div class="home-bg" id="homeBg"></div>
     <div class="home-glow"></div>
     <div class="home-inner">
-      <div class="home-clock" id="homeClock">--:--</div>
-      <div class="home-date" id="homeDate"></div>
+      <header class="home-head">
+        <div class="home-clock" id="homeClock">--:--</div>
+        <div class="home-date" id="homeDate"></div>
+        <div class="home-greet" id="homeGreeting">下午好</div>
+      </header>
+
+      <section class="couple-card" id="coupleCard">
+        <div class="couple-main">
+          <div class="couple-side">
+            <span class="couple-avatar" id="homeSelfAvatar">我</span>
+            <span class="couple-name" id="homeSelfName">我</span>
+          </div>
+          <div class="couple-core">
+            <span class="couple-kicker">已相恋</span>
+            <span class="couple-days"><b id="homeDays">--</b><i>天</i></span>
+            <span class="couple-since" id="homeSince"></span>
+          </div>
+          <div class="couple-side">
+            <span class="couple-avatar" id="homePeerAvatar">林</span>
+            <span class="couple-name" id="homePeerName">林深</span>
+          </div>
+        </div>
+        <div class="couple-music" aria-hidden="true">
+          <span class="music-disc"><span></span></span>
+          <span class="music-title">还没有歌曲</span>
+          <span class="music-eq"><i></i><i></i><i></i><i></i></span>
+          <span class="music-play"><svg class="ic"><use href="#i-play"></use></svg></span>
+        </div>
+      </section>
+
       <div class="app-grid">
         <button class="app-entry" data-open="chat" aria-label="对话">
           <span class="app-tile"><svg class="app-ico"><use href="#i-chat"></use></svg></span>
@@ -143,6 +172,57 @@
         <div class="row dep" data-dep="typing"><span class="row-label">文案</span><input class="field mid" type="text" maxlength="24" data-setting="typingText"></div>
       </div>
 
+      <div class="group-title">主页</div>
+      <div class="setting-card">
+        <div class="row"><span class="row-label">纪念日</span><input class="field date" type="date" data-setting="startDate"></div>
+        <div class="row"><span class="row-label">我的名字</span><input class="field mid" type="text" maxlength="10" data-setting="selfName"></div>
+        <div class="row"><span class="row-label">我的头像</span>
+          <div class="mini-actions">
+            <span class="mini-avatar" id="selfAvatarPreview"></span>
+            <button class="mini-btn" id="selfAvatarPick">更换</button>
+            <button class="mini-btn" id="selfAvatarClear">清除</button>
+          </div>
+        </div>
+        <div class="row"><span class="row-label">TA 的名字</span><input class="field mid" type="text" maxlength="10" data-setting="peerName"></div>
+        <div class="row"><span class="row-label">TA 的头像</span>
+          <div class="mini-actions">
+            <span class="mini-avatar" id="peerAvatarPreview"></span>
+            <button class="mini-btn" id="peerAvatarPick">更换</button>
+            <button class="mini-btn" id="peerAvatarClear">清除</button>
+          </div>
+        </div>
+        <div class="row"><span class="row-label">主页背景</span>
+          <div class="mini-actions">
+            <span class="bg-preview" id="homeBgPreview"></span>
+            <button class="mini-btn" id="homeBgPick">更换</button>
+            <button class="mini-btn" id="homeBgClear">清除</button>
+          </div>
+        </div>
+        <div class="row"><span class="row-label">卡片背景</span>
+          <div class="mini-actions">
+            <span class="bg-preview" id="cardBgPreview"></span>
+            <button class="mini-btn" id="cardBgPick">更换</button>
+            <button class="mini-btn" id="cardBgClear">清除</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group-title">聊天</div>
+      <div class="setting-card">
+        <div class="row"><span class="row-label">显示名称</span><input type="checkbox" class="switch" data-setting="showName"></div>
+        <div class="row"><span class="row-label">显示头像</span><input type="checkbox" class="switch" data-setting="showAvatar"></div>
+        <div class="row"><span class="row-label">时间戳</span><input type="checkbox" class="switch" data-setting="showTime"></div>
+        <div class="row"><span class="row-label">已读</span><input type="checkbox" class="switch" data-setting="showRead"></div>
+        <div class="row dep" data-dep="showRead"><span class="row-label">已读文案</span><input class="field mid" type="text" maxlength="8" data-setting="readText"></div>
+        <div class="row"><span class="row-label">聊天背景</span>
+          <div class="mini-actions">
+            <span class="bg-preview" id="bgPreview"></span>
+            <button class="mini-btn" id="bgPick">更换</button>
+            <button class="mini-btn" id="bgClear">清除</button>
+          </div>
+        </div>
+      </div>
+
       <div class="group-title">外观</div>
       <div class="setting-card">
         <div class="row"><span class="row-label">主题</span>
@@ -156,33 +236,9 @@
         <div class="row range-row"><input class="range" type="range" min="12" max="22" step="1" data-setting="fontSize"></div>
         <div class="row stack"><span class="row-label">字体</span><input class="field full" type="text" data-setting="fontFamily" spellcheck="false"></div>
         <div class="row stack"><span class="row-label">字体链接</span><input class="field full" type="text" data-setting="fontUrl" placeholder="CSS 或字体 URL" spellcheck="false"></div>
-        <div class="row"><span class="row-label">显示名称</span><input type="checkbox" class="switch" data-setting="showName"></div>
-        <div class="row"><span class="row-label">显示头像</span><input type="checkbox" class="switch" data-setting="showAvatar"></div>
-        <div class="row"><span class="row-label">时间戳</span><input type="checkbox" class="switch" data-setting="showTime"></div>
-        <div class="row"><span class="row-label">已读</span><input type="checkbox" class="switch" data-setting="showRead"></div>
-        <div class="row dep" data-dep="showRead"><span class="row-label">已读文案</span><input class="field mid" type="text" maxlength="8" data-setting="readText"></div>
-        <div class="row"><span class="row-label">聊天背景</span>
-          <div class="mini-actions">
-            <span class="bg-preview" id="bgPreview"></span>
-            <button class="mini-btn" id="bgPick">更换</button>
-            <button class="mini-btn" id="bgClear">清除</button>
-          </div>
-        </div>
         <div class="row stack">
           <div class="row-head"><span class="row-label">气泡样式</span><button class="mini-btn" id="bubbleReset">恢复</button></div>
           <textarea class="field area" rows="4" data-setting="bubbleCss" placeholder="CSS，或样式表 URL" spellcheck="false"></textarea>
-        </div>
-      </div>
-
-      <div class="group-title">角色</div>
-      <div class="setting-card">
-        <div class="row"><span class="row-label">名称</span><input class="field mid" type="text" maxlength="12" data-setting="peerName"></div>
-        <div class="row"><span class="row-label">头像</span>
-          <div class="mini-actions">
-            <span class="mini-avatar" id="peerAvatarPreview"></span>
-            <button class="mini-btn" id="peerAvatarPick">更换</button>
-            <button class="mini-btn" id="peerAvatarClear">清除</button>
-          </div>
         </div>
       </div>
 
@@ -227,6 +283,9 @@
 
 <input type="file" id="bgFile" accept="image/*" hidden>
 <input type="file" id="avatarFile" accept="image/*" hidden>
+<input type="file" id="selfAvatarFile" accept="image/*" hidden>
+<input type="file" id="homeBgFile" accept="image/*" hidden>
+<input type="file" id="cardBgFile" accept="image/*" hidden>
 <input type="file" id="allImport" accept="application/json,.json" hidden>
 
 <script src="js/core.js"></script>

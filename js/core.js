@@ -41,6 +41,8 @@ const randomOf = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 function defaultState() {
   const gDaily = 'g_daily', gNight = 'g_night', gMisc = 'g_misc';
+  const today = new Date();
+  const startDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   return {
     v: 1,
     settings: {
@@ -71,7 +73,10 @@ function defaultState() {
       peerName: '林深',
       peerAvatar: '',
       selfName: '我',
-      selfAvatar: ''
+      selfAvatar: '',
+      startDate,
+      homeBg: '',
+      cardBg: ''
     },
     sounds: [
       { id: 's_blip', name: '轻响', kind: 'synth', preset: 'blip' },
@@ -318,6 +323,72 @@ function updateChatHeader() {
   }
 }
 
+function setHomeAvatar(el, name, img) {
+  if (!el) return;
+  if (img) el.innerHTML = `<img src="${img}" alt="">`;
+  else el.textContent = initialOf(name) || '·';
+}
+
+function daysTogether() {
+  const raw = String(S.settings.startDate || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const parts = raw.split('-').map(Number);
+  const start = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (isNaN(start.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.floor((today - start) / 86400000);
+  return diff >= 0 ? diff + 1 : 0;
+}
+
+function updateHomeMeta() {
+  const greet = $('#homeGreeting');
+  if (greet) {
+    const h = new Date().getHours();
+    greet.textContent = h < 5 ? '夜深了' : h < 11 ? '早安' : h < 14 ? '中午好' : h < 18 ? '下午好' : h < 23 ? '晚上好' : '晚安';
+  }
+  const days = daysTogether();
+  const dEl = $('#homeDays');
+  if (dEl) dEl.textContent = days === null ? '--' : String(days);
+  const since = $('#homeSince');
+  if (since) {
+    const raw = String(S.settings.startDate || '');
+    since.textContent = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.replace(/-/g, '.') : '设定纪念日';
+  }
+}
+
+function applyHome() {
+  const bg = $('#homeBg');
+  if (bg) {
+    if (S.settings.homeBg) {
+      bg.style.backgroundImage = `url("${S.settings.homeBg}")`;
+      bg.classList.add('on');
+    } else {
+      bg.style.backgroundImage = '';
+      bg.classList.remove('on');
+    }
+  }
+  const card = $('#coupleCard');
+  if (card) {
+    if (S.settings.cardBg) {
+      card.style.backgroundImage = `url("${S.settings.cardBg}")`;
+      card.classList.add('has-img');
+    } else {
+      card.style.backgroundImage = '';
+      card.classList.remove('has-img');
+    }
+  }
+  const selfName = S.settings.selfName || '我';
+  const peerName = S.settings.peerName || '林深';
+  const sn = $('#homeSelfName');
+  if (sn) sn.textContent = selfName;
+  const pn = $('#homePeerName');
+  if (pn) pn.textContent = peerName;
+  setHomeAvatar($('#homeSelfAvatar'), selfName, S.settings.selfAvatar);
+  setHomeAvatar($('#homePeerAvatar'), peerName, S.settings.peerAvatar);
+  updateHomeMeta();
+}
+
 function applyAppearance() {
   applyTheme();
   applyFonts();
@@ -325,6 +396,7 @@ function applyAppearance() {
   applyChatBg();
   applyChatClasses();
   updateChatHeader();
+  applyHome();
 }
 
 /* ------------------------------------------------------------
@@ -352,9 +424,9 @@ function synthSound(preset) {
   if (!ctx) return;
   const t = ctx.currentTime;
   const tones = {
-    blip: [[620, .09, .045], [880, .07, .02]],
-    tick: [[1180, .035, .035], [720, .05, .015]],
-    chime: [[784, .34, .035], [1176, .28, .018], [1568, .2, .008]]
+    blip: [[620, .13, .17], [880, .1, .09]],
+    tick: [[1180, .06, .13], [720, .08, .06]],
+    chime: [[784, .42, .13], [1176, .34, .08], [1568, .24, .04]]
   }[preset] || [[660, .1, .04]];
 
   tones.forEach(([freq, dur, gain], i) => {
@@ -378,13 +450,13 @@ function playSoundItem(sound) {
   } else if (sound.data) {
     try {
       const audio = new Audio(sound.data);
-      audio.volume = .7;
+      audio.volume = 1;
       audio.play().catch(() => {});
     } catch (e) { /* ignore */ }
   } else if (sound.url) {
     try {
       const audio = new Audio(sound.url);
-      audio.volume = .7;
+      audio.volume = 1;
       audio.play().catch(() => {});
     } catch (e) { /* ignore */ }
   }
@@ -654,6 +726,7 @@ function updateClock() {
     const wd = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(d);
     date.textContent = `${md} · ${wd}`;
   }
+  updateHomeMeta();
 }
 
 let introDone = false;

@@ -23,19 +23,29 @@ function syncDependentRows() {
   });
 }
 
-function updatePreviews() {
-  const bg = $('#bgPreview');
-  if (bg) bg.style.backgroundImage = S.settings.bg ? `url("${S.settings.bg}")` : '';
-  const av = $('#peerAvatarPreview');
-  if (av) {
-    if (S.settings.peerAvatar) {
-      av.style.backgroundImage = `url("${S.settings.peerAvatar}")`;
-      av.textContent = '';
-    } else {
-      av.style.backgroundImage = '';
-      av.textContent = initialOf(S.settings.peerName);
-    }
+function paintPreview(el, img, fallbackText) {
+  if (!el) return;
+  if (img) {
+    el.style.backgroundImage = `url("${img}")`;
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = fallbackText || '';
   }
+}
+
+function updatePreviews() {
+  const bgs = [
+    ['#bgPreview', S.settings.bg],
+    ['#homeBgPreview', S.settings.homeBg],
+    ['#cardBgPreview', S.settings.cardBg]
+  ];
+  bgs.forEach(([sel, img]) => {
+    const el = $(sel);
+    if (el) el.style.backgroundImage = img ? `url("${img}")` : '';
+  });
+  paintPreview($('#peerAvatarPreview'), S.settings.peerAvatar, initialOf(S.settings.peerName));
+  paintPreview($('#selfAvatarPreview'), S.settings.selfAvatar, initialOf(S.settings.selfName || '我'));
 }
 
 function syncSettingsUI() {
@@ -176,6 +186,33 @@ function onSettingEvent(e) {
   if (key === 'showRead' || key === 'readText') applyChatClasses();
 }
 
+function bindImageSetting({ pick, file, clear, apply }, maxSide, quality) {
+  const pickEl = $(pick);
+  const fileEl = $(file);
+  const clearEl = $(clear);
+  if (pickEl && fileEl) {
+    pickEl.addEventListener('click', () => fileEl.click());
+    fileEl.addEventListener('change', async () => {
+      if (!fileEl.files || !fileEl.files[0]) return;
+      try {
+        const img = await imageToDataURL(fileEl.files[0], maxSide, quality);
+        apply(img);
+        updatePreviews();
+        save();
+        toast('已更新');
+      } catch (e) { toast('图片读取失败'); }
+      fileEl.value = '';
+    });
+  }
+  if (clearEl) {
+    clearEl.addEventListener('click', () => {
+      apply('');
+      updatePreviews();
+      save();
+    });
+  }
+}
+
 function initSettings() {
   const root = $('#app-settings');
   if (!root) return;
@@ -237,6 +274,7 @@ function initSettings() {
       try {
         S.settings.peerAvatar = await imageToDataURL(avatarFile.files[0], 240, .86);
         updateChatHeader();
+        applyHome();
         updatePreviews();
         renderMessages();
         save();
@@ -248,10 +286,26 @@ function initSettings() {
   if (avatarClear) avatarClear.addEventListener('click', () => {
     S.settings.peerAvatar = '';
     updateChatHeader();
+    applyHome();
     updatePreviews();
     renderMessages();
     save();
   });
+
+  bindImageSetting({
+    pick: '#selfAvatarPick', file: '#selfAvatarFile', clear: '#selfAvatarClear',
+    apply: (img) => { S.settings.selfAvatar = img; applyHome(); }
+  }, 240, .86);
+
+  bindImageSetting({
+    pick: '#homeBgPick', file: '#homeBgFile', clear: '#homeBgClear',
+    apply: (img) => { S.settings.homeBg = img; applyHome(); }
+  }, 1600, .82);
+
+  bindImageSetting({
+    pick: '#cardBgPick', file: '#cardBgFile', clear: '#cardBgClear',
+    apply: (img) => { S.settings.cardBg = img; applyHome(); }
+  }, 1200, .82);
 
   const bubbleReset = $('#bubbleReset');
   if (bubbleReset) bubbleReset.addEventListener('click', () => {
