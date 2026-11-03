@@ -11,6 +11,7 @@ let flow = 0;
 let flowBusy = false;
 let proactiveTimer = null;
 let replyRoundTimer = null;
+let notifyAskDone = false;
 const waiters = new Set();
 
 function speaker() {
@@ -193,7 +194,7 @@ function scheduleReplyRound() {
   replyRoundTimer = setTimeout(() => {
     replyRoundTimer = null;
     triggerReply();
-  }, 900);
+  }, 1200);
 }
 
 function replyDelay() {
@@ -208,26 +209,45 @@ function replyDelay() {
    对方发言
    ------------------------------------------------------------ */
 
+function ensureNotifyPermission() {
+  if (notifyAskDone) return;
+  notifyAskDone = true;
+  if (!S.settings.notify) return;
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  Notification.requestPermission().then((permission) => {
+    if (permission !== 'granted') {
+      S.settings.notify = false;
+      S.settings.notifyTouched = true;
+      save();
+      syncSettingsUI();
+      toast('通知权限未开启');
+    }
+  });
+}
+
 function notifyIncoming(text, sticker) {
   if (!S.settings.notify) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (!document.hidden && $('#app-chat').classList.contains('open')) return;
-  const body = sticker ? '[表情]' : text;
-  const fallback = () => {
-    try { new Notification('回讯', { body, tag: 'huixun-message', silent: true }); } catch (e) { /* ignore */ }
+  const body = sticker ? '[表情]' : (text || '新消息');
+  const options = {
+    body,
+    tag: 'huixun-message',
+    renotify: true,
+    timestamp: Date.now(),
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    data: { url: './' },
+    silent: false,
+    vibrate: [80, 40, 80]
   };
-  if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
-    navigator.serviceWorker.getRegistration().then((reg) => {
-      if (!reg) return fallback();
-      reg.showNotification('回讯', {
-        body,
-        tag: 'huixun-message',
-        icon: './icons/icon-192.png',
-        badge: './icons/icon-192.png',
-        data: { url: './' },
-        silent: true
-      }).catch(fallback);
-    }).catch(fallback);
+  const fallback = () => {
+    try { new Notification('回讯', options); } catch (e) { /* ignore */ }
+  };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification('回讯', options))
+      .catch(fallback);
   } else {
     fallback();
   }
@@ -339,6 +359,7 @@ function sendUserMessage() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  ensureNotifyPermission();
   beginUserTurn();
   const m = {
     id: uid(),
@@ -355,6 +376,7 @@ function sendUserMessage() {
 
 function sendStickerMessage(image) {
   if (!image) return;
+  ensureNotifyPermission();
   beginUserTurn();
   const m = {
     id: uid(),
@@ -372,6 +394,7 @@ function sendStickerMessage(image) {
 
 function sendImageMessage(image) {
   if (!image) return;
+  ensureNotifyPermission();
   beginUserTurn();
   const m = {
     id: uid(),
@@ -385,44 +408,6 @@ function sendImageMessage(image) {
   appendMessage(m);
   playSendSound();
   scheduleReplyRound();
-}
-
-function sendBatchMessages(lines) {
-  const list = lines.map((x) => String(x || '').trim()).filter(Boolean);
-  if (!list.length) return;
-  beginUserTurn();
-  list.forEach((text) => {
-    appendMessage({
-      id: uid(),
-      role: 'me',
-      text,
-      ts: Date.now(),
-      quote: null,
-      read: false
-    });
-  });
-  playSendSound();
-  scheduleReplyRound();
-}
-
-function openBatchSend() {
-  const body = `
-    <p class="sheet-note">一行一条，连续发出，对方会把它们当作一轮消息回复。</p>
-    <textarea class="sheet-textarea" id="batchMsgText" rows="6" placeholder="第一条&#10;第二条&#10;第三条"></textarea>
-    <div class="sheet-actions">
-      <button class="sheet-btn" data-close-sheet>取消</button>
-      <button class="sheet-btn primary" id="batchMsgSend">发送</button>
-    </div>`;
-  openSheet(sheetShell('批量发送', body));
-  const area = $('#batchMsgText');
-  if (area) setTimeout(() => area.focus(), 120);
-  const btn = $('#batchMsgSend');
-  if (btn) btn.addEventListener('click', () => {
-    const lines = area ? area.value.split('\n') : [];
-    if (!lines.some((x) => x.trim())) { toast('写点什么'); return; }
-    closeSheet();
-    sendBatchMessages(lines);
-  });
 }
 
 function openStickerSheet() {
@@ -596,11 +581,6 @@ function openChatMenu() {
       label: '查找聊天记录',
       icon: 'i-search',
       action: openChatSearch
-    },
-    {
-      label: '批量发送',
-      icon: 'i-chat',
-      action: openBatchSend
     },
     {
       label: '删除全部消息',

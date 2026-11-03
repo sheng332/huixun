@@ -175,6 +175,7 @@ function onSettingEvent(e) {
   else value = el.value;
 
   if (NUMERIC_SETTINGS.has(key)) value = Number(value);
+  if (key === 'notify') S.settings.notifyTouched = true;
 
   S.settings[key] = value;
   if (key === 'delaySec' && value < Number(S.settings.minDelaySec || 0)) {
@@ -371,10 +372,22 @@ function initSettings() {
         const raw = await readFileText(allImport.files[0]);
         const data = JSON.parse(raw.replace(/^\ufeff/, ''));
         if (!data || !data.settings || !Array.isArray(data.cards)) throw new Error('bad');
+        const incomingHasSticker = data.cards.some(isSticker);
+        const incomingHasText = data.cards.some((c) => !isSticker(c) && String(c.text || '').trim());
+        const keepStickers = !incomingHasSticker && S.cards.some(isSticker);
+        const keepText = !incomingHasText && S.cards.some((c) => !isSticker(c) && String(c.text || '').trim());
+        if (keepStickers || keepText) {
+          const kept = S.cards.filter((c) => (keepStickers && isSticker(c)) || (keepText && !isSticker(c)));
+          const keptGroups = new Set(kept.map((c) => c.groupId));
+          const groups = Array.isArray(data.groups) ? data.groups : [];
+          const groupIds = new Set(groups.map((g) => g.id));
+          data.groups = groups.concat(S.groups.filter((g) => keptGroups.has(g.id) && !groupIds.has(g.id)));
+          data.cards = data.cards.concat(kept);
+        }
         allImport.value = '';
         const ok = await confirmSheet({
           title: '导入全部',
-          message: '当前所有数据将被覆盖。',
+          message: '同类型数据将被文件覆盖；文件里没有的字卡或表情会保留。',
           okText: '导入',
           danger: false
         });

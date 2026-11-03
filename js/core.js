@@ -68,7 +68,7 @@ function defaultState() {
       stickerProb: 30,
       typing: true,
       typingText: '正在输入',
-      notify: false,
+      notify: true,
       inAppNotify: true,
       bgKeepAlive: true,
       sound: true,
@@ -117,6 +117,7 @@ function normalize(raw) {
   if (rs.combineProb === undefined) out.settings.combineProb = rs.combine ? 50 : 0;
   if (rs.stickerProb === undefined) out.settings.stickerProb = 20;
   if (rs.inAppNotify === undefined) out.settings.inAppNotify = true;
+  if (rs.notifyTouched === undefined) out.settings.notify = true;
   out.sounds = Array.isArray(raw.sounds) ? raw.sounds : base.sounds;
   out.groups = Array.isArray(raw.groups) && raw.groups.length ? raw.groups.filter(g => g && g.id) : base.groups;
   out.cards = Array.isArray(raw.cards) ? raw.cards.filter(c => c && c.id) : base.cards;
