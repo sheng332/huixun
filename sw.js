@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'huixun-v7';
+const CACHE = 'huixun-v8';
 const ASSETS = [
   './',
   './index.html',
