@@ -58,15 +58,18 @@ function defaultState() {
       showRead: true,
       readText: '已读',
       delaySec: 4,
+      minDelaySec: 1,
       activeEnabled: false,
       activeMin: 10,
       noReply: false,
       noReplyRate: 30,
-      quote: false,
-      combine: false,
+      quoteProb: 30,
+      combineProb: 30,
+      stickerProb: 30,
       typing: true,
       typingText: '正在输入',
       notify: false,
+      inAppNotify: true,
       bgKeepAlive: true,
       sound: true,
       soundRandom: false,
@@ -109,6 +112,11 @@ function normalize(raw) {
   if (!raw || typeof raw !== 'object') return base;
   const out = Object.assign({}, base, raw);
   out.settings = Object.assign({}, base.settings, raw.settings || {});
+  const rs = raw.settings || {};
+  if (rs.quoteProb === undefined) out.settings.quoteProb = rs.quote ? 55 : 0;
+  if (rs.combineProb === undefined) out.settings.combineProb = rs.combine ? 50 : 0;
+  if (rs.stickerProb === undefined) out.settings.stickerProb = 20;
+  if (rs.inAppNotify === undefined) out.settings.inAppNotify = true;
   out.sounds = Array.isArray(raw.sounds) ? raw.sounds : base.sounds;
   out.groups = Array.isArray(raw.groups) && raw.groups.length ? raw.groups.filter(g => g && g.id) : base.groups;
   out.cards = Array.isArray(raw.cards) ? raw.cards.filter(c => c && c.id) : base.cards;

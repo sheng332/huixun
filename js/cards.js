@@ -596,6 +596,54 @@ function importCardsFile() {
   input.click();
 }
 
+function compressSticker(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, 340 / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const keepAlpha = /png|webp|gif|svg/i.test(file.type || '');
+        resolve(canvas.toDataURL(keepAlpha ? 'image/png' : 'image/jpeg', .82));
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src = url;
+  });
+}
+
+async function importStickersFromAlbum(files) {
+  const list = Array.from(files || []).filter((f) => /image\//i.test(f.type || ''));
+  if (!list.length) return;
+  const gid = ensureGroup('表情');
+  const existing = new Set(S.cards.filter(isSticker).map((c) => stickerKey(c.image)));
+  let added = 0;
+  toast('正在导入');
+  for (const file of list) {
+    try {
+      const image = await compressSticker(file);
+      const key = stickerKey(image);
+      if (existing.has(key)) continue;
+      existing.add(key);
+      S.cards.push({ id: uid(), groupId: gid, type: 'sticker', image, hidden: false });
+      added++;
+    } catch (e) { /* 跳过无法识别的图片 */ }
+  }
+  save();
+  renderCards();
+  toast(added ? `已导入 ${added} 个表情` : '没有新表情');
+}
+
 function dedupeCards() {
   const seen = new Set();
   const kept = [];
@@ -679,6 +727,7 @@ function initCards() {
     menuSheet('字卡库', [
       { label: '批量添加', icon: 'i-plus', action: () => openAddCardSheet('batch') },
       { label: '导入字卡 / 表情', icon: 'i-upload', action: importCardsFile },
+      { label: '相册批量导入表情', icon: 'i-image', action: () => { const f = $('#stickerImportFile'); if (f) f.click(); } },
       { label: '导出 txt', icon: 'i-download', action: exportCards },
       { label: '导出字卡库 JSON', icon: 'i-download', action: exportMochi },
       { label: '分组', icon: 'i-move', action: openGroupManager },
@@ -690,6 +739,12 @@ function initCards() {
   if (allBtn) allBtn.addEventListener('click', () => {
     activeCardList().forEach((c) => selectedCards.add(c.id));
     renderCards();
+  });
+  const stickerImport = $('#stickerImportFile');
+  if (stickerImport) stickerImport.addEventListener('change', () => {
+    const files = Array.from(stickerImport.files || []);
+    stickerImport.value = '';
+    if (files.length) importStickersFromAlbum(files);
   });
   const moveBtn = $('#batchMove');
   if (moveBtn) moveBtn.addEventListener('click', batchMove);

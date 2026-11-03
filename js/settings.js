@@ -4,14 +4,24 @@
    设置
    ------------------------------------------------------------ */
 
-const NUMERIC_SETTINGS = new Set(['fontSize', 'delaySec', 'activeMin', 'noReplyRate']);
+const NUMERIC_SETTINGS = new Set([
+  'fontSize', 'delaySec', 'minDelaySec', 'activeMin', 'noReplyRate',
+  'quoteProb', 'combineProb', 'stickerProb'
+]);
 
 function updateValueLabels() {
   const set = (id, text) => { const el = $(id); if (el) el.textContent = text; };
-  const sec = Number(S.settings.delaySec) || 0;
-  set('#delayVal', sec >= 60 ? `${Math.floor(sec / 60)} 分${sec % 60 ? ` ${sec % 60} 秒` : ''}` : `${sec} 秒`);
+  const fmtSec = (value) => {
+    const sec = Number(value) || 0;
+    return sec >= 60 ? `${Math.floor(sec / 60)} 分${sec % 60 ? ` ${sec % 60} 秒` : ''}` : `${sec} 秒`;
+  };
+  set('#delayVal', fmtSec(S.settings.delaySec));
+  set('#minDelayVal', fmtSec(S.settings.minDelaySec));
   set('#activeVal', `${S.settings.activeMin} 分钟`);
   set('#noReplyVal', `${S.settings.noReplyRate}%`);
+  set('#quoteVal', `${S.settings.quoteProb}%`);
+  set('#combineVal', `${S.settings.combineProb}%`);
+  set('#stickerVal', `${S.settings.stickerProb}%`);
   set('#fontVal', `${S.settings.fontSize}`);
 }
 
@@ -167,11 +177,23 @@ function onSettingEvent(e) {
   if (NUMERIC_SETTINGS.has(key)) value = Number(value);
 
   S.settings[key] = value;
+  if (key === 'delaySec' && value < Number(S.settings.minDelaySec || 0)) {
+    S.settings.minDelaySec = value;
+  }
+  if (key === 'minDelaySec' && value > Number(S.settings.delaySec || 0)) {
+    S.settings.delaySec = value;
+  }
   save();
 
   applyAppearance();
   updateValueLabels();
   syncDependentRows();
+  if (key === 'delaySec' || key === 'minDelaySec') {
+    const minEl = $('[data-setting="minDelaySec"]');
+    const maxEl = $('[data-setting="delaySec"]');
+    if (minEl) minEl.value = S.settings.minDelaySec;
+    if (maxEl) maxEl.value = S.settings.delaySec;
+  }
 
   if (key === 'activeEnabled' || key === 'activeMin') scheduleProactive();
   if (key === 'notify') handleNotifyToggle(value);
