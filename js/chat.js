@@ -10,6 +10,7 @@ let typingEl = null;
 let flow = 0;
 let flowBusy = false;
 let proactiveTimer = null;
+let replyRoundTimer = null;
 const waiters = new Set();
 
 function speaker() {
@@ -68,6 +69,7 @@ function appendMessage(m) {
   S.messages.push(m);
   if (msgList) {
     msgList.insertAdjacentHTML('beforeend', messageHTML(m));
+    if (typingEl && typingEl.parentNode === msgList) msgList.appendChild(typingEl);
     scrollChatBottom(true);
   }
   save();
@@ -178,8 +180,20 @@ function cancelFlows() {
   waiters.clear();
   hideTyping();
   flowBusy = false;
-  clearTimeout(proactiveTimer);
-  proactiveTimer = null;
+}
+
+function beginUserTurn() {
+  clearTimeout(replyRoundTimer);
+  replyRoundTimer = null;
+  if (flowBusy) cancelFlows();
+}
+
+function scheduleReplyRound() {
+  clearTimeout(replyRoundTimer);
+  replyRoundTimer = setTimeout(() => {
+    replyRoundTimer = null;
+    triggerReply();
+  }, 900);
 }
 
 function replyDelay() {
@@ -286,6 +300,8 @@ async function runReplyFlow(opts = {}) {
 }
 
 function triggerReply() {
+  clearTimeout(replyRoundTimer);
+  replyRoundTimer = null;
   if (!availableCards().length) {
     toast('字卡库是空的');
     return;
@@ -323,6 +339,7 @@ function sendUserMessage() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  beginUserTurn();
   const m = {
     id: uid(),
     role: 'me',
@@ -333,11 +350,12 @@ function sendUserMessage() {
   };
   appendMessage(m);
   playSendSound();
-  triggerReply();
+  scheduleReplyRound();
 }
 
 function sendStickerMessage(image) {
   if (!image) return;
+  beginUserTurn();
   const m = {
     id: uid(),
     role: 'me',
@@ -349,11 +367,12 @@ function sendStickerMessage(image) {
   };
   appendMessage(m);
   playSendSound();
-  triggerReply();
+  scheduleReplyRound();
 }
 
 function sendImageMessage(image) {
   if (!image) return;
+  beginUserTurn();
   const m = {
     id: uid(),
     role: 'me',
@@ -365,7 +384,45 @@ function sendImageMessage(image) {
   };
   appendMessage(m);
   playSendSound();
-  triggerReply();
+  scheduleReplyRound();
+}
+
+function sendBatchMessages(lines) {
+  const list = lines.map((x) => String(x || '').trim()).filter(Boolean);
+  if (!list.length) return;
+  beginUserTurn();
+  list.forEach((text) => {
+    appendMessage({
+      id: uid(),
+      role: 'me',
+      text,
+      ts: Date.now(),
+      quote: null,
+      read: false
+    });
+  });
+  playSendSound();
+  scheduleReplyRound();
+}
+
+function openBatchSend() {
+  const body = `
+    <p class="sheet-note">一行一条，连续发出，对方会把它们当作一轮消息回复。</p>
+    <textarea class="sheet-textarea" id="batchMsgText" rows="6" placeholder="第一条&#10;第二条&#10;第三条"></textarea>
+    <div class="sheet-actions">
+      <button class="sheet-btn" data-close-sheet>取消</button>
+      <button class="sheet-btn primary" id="batchMsgSend">发送</button>
+    </div>`;
+  openSheet(sheetShell('批量发送', body));
+  const area = $('#batchMsgText');
+  if (area) setTimeout(() => area.focus(), 120);
+  const btn = $('#batchMsgSend');
+  if (btn) btn.addEventListener('click', () => {
+    const lines = area ? area.value.split('\n') : [];
+    if (!lines.some((x) => x.trim())) { toast('写点什么'); return; }
+    closeSheet();
+    sendBatchMessages(lines);
+  });
 }
 
 function openStickerSheet() {
@@ -524,6 +581,8 @@ async function clearMessages() {
     danger: true
   });
   if (!ok) return;
+  clearTimeout(replyRoundTimer);
+  replyRoundTimer = null;
   cancelFlows();
   S.messages = [];
   renderMessages();
@@ -537,6 +596,11 @@ function openChatMenu() {
       label: '查找聊天记录',
       icon: 'i-search',
       action: openChatSearch
+    },
+    {
+      label: '批量发送',
+      icon: 'i-chat',
+      action: openBatchSend
     },
     {
       label: '删除全部消息',

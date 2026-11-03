@@ -7,6 +7,7 @@
 let cardSearch = '';
 let cardGroup = 'all';
 let cardSort = 'default';
+let cardTab = 'text';
 let manageMode = false;
 const selectedCards = new Set();
 
@@ -52,13 +53,11 @@ function sortedCards(list) {
 }
 
 function activeCardList() {
-  const q = cardSearch.trim().toLowerCase();
+  const q = cardTab === 'text' ? cardSearch.trim().toLowerCase() : '';
   return S.cards.filter((c) => {
+    if (cardTab === 'sticker' ? !isSticker(c) : isSticker(c)) return false;
     if (cardGroup !== 'all' && c.groupId !== cardGroup) return false;
-    if (q) {
-      if (isSticker(c)) return false;
-      if (!String(c.text || '').toLowerCase().includes(q)) return false;
-    }
+    if (q && !String(c.text || '').toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -85,17 +84,50 @@ function renderGroupChips() {
   box.innerHTML = chips.join('');
 }
 
+function syncCardTabs() {
+  const textCount = S.cards.filter((c) => !isSticker(c)).length;
+  const stickerCount = S.cards.filter(isSticker).length;
+  const textEl = $('#textTabCount');
+  const stickerEl = $('#stickerTabCount');
+  if (textEl) textEl.textContent = String(textCount);
+  if (stickerEl) stickerEl.textContent = String(stickerCount);
+  $$('#cardTabs [data-card-tab]').forEach((btn) => {
+    btn.classList.toggle('on', btn.dataset.cardTab === cardTab);
+  });
+  const search = $('#cardSearch');
+  if (search) {
+    search.placeholder = cardTab === 'sticker' ? '表情包' : '搜索字卡';
+    search.disabled = cardTab === 'sticker';
+  }
+  const toolbar = $('.cards-toolbar');
+  if (toolbar) toolbar.classList.toggle('off', cardTab === 'sticker');
+  const fab = $('#addCardBtn');
+  if (fab) fab.setAttribute('aria-label', cardTab === 'sticker' ? '导入表情包' : '添加字卡');
+}
+
 function renderCards() {
   const body = $('#cardsBody');
   if (!body) return;
   if (cardGroup !== 'all' && !S.groups.some((g) => g.id === cardGroup)) cardGroup = 'all';
 
+  syncCardTabs();
   const list = sortedCards(activeCardList());
+  const q = cardSearch.trim();
+
+  if (cardTab === 'sticker') {
+    body.innerHTML = list.length
+      ? `<div class="sticker-wall">${list.map(cardItemHTML).join('')}</div>`
+      : `<div class="empty-note">还没有表情包，点右下角从相册导入</div>`;
+    body.classList.toggle('manage', manageMode);
+    updateBatchBar();
+    renderGroupChips();
+    return;
+  }
+
   const groups = cardGroup === 'all'
     ? S.groups
     : S.groups.filter((g) => g.id === cardGroup);
 
-  const q = cardSearch.trim();
   let html = '';
   groups.forEach((g) => {
     const items = list.filter((c) => c.groupId === g.id);
@@ -400,20 +432,87 @@ function renameGroup(g) {
 }
 
 function openGroupManager() {
+  if (!S.groups.length) { toast('还没有分组'); return; }
+  const selected = new Set();
+
   const rows = S.groups.map((g) => {
     const count = S.cards.filter((c) => c.groupId === g.id).length;
-    return `<div class="member-row">
-      <span class="member-name" style="${g.hidden ? 'opacity:.45' : ''}">${esc(g.name)}</span>
+    return `<div class="group-pick-row" data-select-group="${g.id}"${g.hidden ? ' data-off="1"' : ''}>
+      <span class="check" data-group-check="${g.id}"><svg class="ic"><use href="#i-check"></use></svg></span>
+      <span class="member-name"${g.hidden ? ' style="opacity:.55"' : ''}>${esc(g.name)}</span>
       <span class="member-sub">${count}${g.hidden ? ' · 屏蔽' : ''}</span>
       <button class="row-mini-btn" data-group-menu="${g.id}" aria-label="分组操作"><svg class="ic"><use href="#i-more"></use></svg></button>
     </div>`;
   }).join('');
-  const body = `${rows}
-    <button class="row action" id="newGroupBtn"><span>新建分组</span><svg class="ic"><use href="#i-plus"></use></svg></button>`;
+
+  const body = `<p class="sheet-note">勾选后可批量删除，分组内的字卡与表情也会一并删除。</p>
+    <div id="groupManageList">${rows}</div>
+    <button class="row action" id="newGroupBtn"><span>新建分组</span><svg class="ic"><use href="#i-plus"></use></svg></button>
+    <div class="sheet-actions">
+      <button class="sheet-btn" id="groupSelectAll">全选</button>
+      <button class="sheet-btn danger" id="groupBatchDelete" disabled>删除选中</button>
+    </div>`;
   openSheet(sheetShell('分组', body));
-  $$('[data-group-menu]', sheet).forEach((btn) => {
-    btn.addEventListener('click', () => openGroupMenu(btn.dataset.groupMenu));
+
+  const list = $('#groupManageList');
+  const delBtn = $('#groupBatchDelete');
+  const allBtn = $('#groupSelectAll');
+
+  const sync = () => {
+    S.groups.forEach((g) => {
+      const row = list && list.querySelector(`[data-select-group="${CSS.escape(g.id)}"]`);
+      if (!row) return;
+      row.querySelector('.check').classList.toggle('on', selected.has(g.id));
+    });
+    if (allBtn) allBtn.textContent = selected.size === S.groups.length ? '取消全选' : '全选';
+    if (delBtn) {
+      delBtn.disabled = !selected.size;
+      delBtn.textContent = selected.size ? `删除选中（${selected.size}）` : '删除选中';
+    }
+  };
+
+  if (list) list.addEventListener('click', (e) => {
+    const menuBtn = e.target.closest('[data-group-menu]');
+    if (menuBtn) {
+      e.stopPropagation();
+      openGroupMenu(menuBtn.dataset.groupMenu);
+      return;
+    }
+    const row = e.target.closest('[data-select-group]');
+    if (!row) return;
+    const id = row.dataset.selectGroup;
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    sync();
   });
+
+  if (allBtn) allBtn.addEventListener('click', () => {
+    if (selected.size === S.groups.length) selected.clear();
+    else S.groups.forEach((g) => selected.add(g.id));
+    sync();
+  });
+
+  if (delBtn) delBtn.addEventListener('click', async () => {
+    if (!selected.size) return;
+    const ids = new Set(selected);
+    const ok = await confirmSheet({
+      title: '删除分组',
+      message: `将删除 ${ids.size} 个分组，及其中全部字卡与表情。`,
+      okText: '删除'
+    });
+    if (!ok) {
+      openGroupManager();
+      return;
+    }
+    S.groups = S.groups.filter((g) => !ids.has(g.id));
+    S.cards = S.cards.filter((c) => !ids.has(c.groupId));
+    if (ids.has(cardGroup)) cardGroup = 'all';
+    selectedCards.clear();
+    save();
+    renderCards();
+    toast(`已删除 ${ids.size} 个分组`);
+  });
+
   const newBtn = $('#newGroupBtn');
   if (newBtn) newBtn.addEventListener('click', () => {
     const body = `
@@ -640,6 +739,8 @@ async function importStickersFromAlbum(files) {
     } catch (e) { /* 跳过无法识别的图片 */ }
   }
   save();
+  cardTab = 'sticker';
+  cardGroup = 'all';
   renderCards();
   toast(added ? `已导入 ${added} 个表情` : '没有新表情');
 }
@@ -710,8 +811,28 @@ function initCards() {
     }
   });
 
+  const tabs = $('#cardTabs');
+  if (tabs) tabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-card-tab]');
+    if (!btn || btn.dataset.cardTab === cardTab) return;
+    cardTab = btn.dataset.cardTab;
+    cardGroup = 'all';
+    if (search) search.value = '';
+    cardSearch = '';
+    selectedCards.clear();
+    if (manageMode) setManageMode(false);
+    renderCards();
+  });
+
   const addBtn = $('#addCardBtn');
-  if (addBtn) addBtn.addEventListener('click', () => openAddCardSheet('single'));
+  if (addBtn) addBtn.addEventListener('click', () => {
+    if (cardTab === 'sticker') {
+      const f = $('#stickerImportFile');
+      if (f) f.click();
+    } else {
+      openAddCardSheet('single');
+    }
+  });
 
   const sortBtn = $('#cardSortBtn');
   if (sortBtn) sortBtn.addEventListener('click', () => {
